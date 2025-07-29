@@ -1,3 +1,6 @@
+
+#InstallKeybdHook
+#InstallMouseHook
 ; Original Author: Abydos, Fritz
 ; orig filename: idlechamp-v1.4.ahk
 ; from striderx2048 210614
@@ -220,6 +223,7 @@ Save_Settings() {
 }
 
 makeGui() {
+	global PhysicalIdleTime
 
 	Gui, 1:New
 	; BOX AREA
@@ -247,7 +251,7 @@ makeGui() {
 	Gui, 1:Add, CheckBox, vC9 gUpdateFromGUI Checked, 9
 	Gui, 1:Add, CheckBox, vC10 gUpdateFromGUI Checked, 10
 	Gui, 1:Add, CheckBox, vC11 gUpdateFromGUI Checked, 11
-	Gui, 1:Add, CheckBox, vC12 gUpdateFromGUI Checked, 12
+	Gui, 1:Add, CheckBox, vC12 gUpdateFromGUI Checked0, 12 ; Takes Screenshot, do not do by default
 
 	Gui, 1:Add, Text, w50 xs ys+150, Priority Seat:
 	Gui, 1:Add, DropDownList, w50 vPriorityChamp gUpdateFromGUI, 1|2|3|4|5|6||7|8|9|10|11|12|
@@ -324,6 +328,9 @@ makeGui() {
 	Gui, 1:Add, Text, xp y+10, AutoProgress Reccomended
 
 	Gui, 1:Add, edit, xs ys+216 w120 vidletime, 00:00:00
+	
+	Gui, 1:Add, Text, xs y+5, Physical Idle Time:
+	Gui, 1:Add, edit, xs y+1 w120 vPhysicalIdleTime, 0 ms
 
 	; BOX AREA
 	Gui, 1:Add, GroupBox, x+25 y6 r13 w140,
@@ -437,6 +444,9 @@ UpdateFromGUI: ; do the work based on GUI controls calling this subroutine
 		SetTimer, doReloadGame, Off
 	}
 
+	; Always update physical idle time display
+	SetTimer, doUpdatePhysicalIdleTime, 100
+
 	; if (IncrementFormations = 1 AND (IncrementFormationRateQ > 0 or IncrementFormationRateW > 0 or IncrementFormationRateE > 0) ){
 	;   gosub doIncrementFormation
 	; }
@@ -475,7 +485,13 @@ return
 
 doKillDistractions:
 	; mouse grid, 3 rows center screen spam clicks kill distractions - this works but takes cursor
-	if ( IsGameActive() ) {
+	; Only kill distractions if desktop is physically idle for 10 seconds
+	if ( IsGameActive() AND A_TimeIdlePhysical > 10000 ) {
+		; Store current focused window
+		WinGet, orig_id, ID, A
+		; Store current mouse position
+		MouseGetPos, origX, origY
+
 		ControlFocus,, %game_title% ahk_exe %game_Exe%
 
 		; MouseClick - works but takes mouse cursor
@@ -495,12 +511,18 @@ doKillDistractions:
 		; MouseClick, left, 1175, 450, 1 ; Also click to collect gold
 		; sleep 17
 
-
 		; if ( SkipBossAnimation != 1 ) {
 		; 	naw, leave it in; it adds dps on the field :P
 		; }
 		MouseClick, left, 640, 360, 1 ; click gems center
 		sleep 17
+
+		; Restore mouse position
+		MouseMove, %origX%, %origY%, 0
+		; Restore focus to original window
+		if (orig_id) {
+			WinActivate, ahk_id %orig_id%
+		}
 	}
 return
 
@@ -973,7 +995,7 @@ SetAllHeroLevel:
 	GuiControl, 1:, C9, 1
 	GuiControl, 1:, C10, 1
 	GuiControl, 1:, C11, 1
-	GuiControl, 1:, C12, 1
+	GuiControl, 1:, C12, 0 ; Takes Screenshot, do not do by default
 	GuiControl, 1:, ClickDmg, 1
 	Gui, 1:Submit, NoHide
 return
@@ -1380,6 +1402,11 @@ l::	; yes I did this, so that paying from steam streaming you can pause with "L"
 	}
 return
 
+
+doUpdatePhysicalIdleTime:
+	; Update the physical idle time display
+	GuiControl, 1:, PhysicalIdleTime, % A_TimeIdlePhysical " ms"
+return
 
 
 Quit:
