@@ -1,4 +1,5 @@
 
+#SingleInstance Force
 #InstallKeybdHook
 #InstallMouseHook
 ; Original Author: Abydos, Fritz
@@ -182,6 +183,10 @@ global gCheckRestartLevelOne := 0
 
 global loadHavilarImp := 0
 
+global origX := 0
+global origY := 0
+global cursorOverlayShown := false
+
 global UserSettings := {}
 UserSettings := LoadObjectFromJSON("idleChamp-leyline.JSON")
 
@@ -298,7 +303,7 @@ makeGui() {
 
 	Gui, 1:Add, CheckBox, vAutoClicker gUpdateFromGUI Checked0, AutoClicker (100ms)
 
-	Gui, 1:Add, CheckBox, vKillDistractions gUpdateFromGUI Checked0, Kill Distractions (80ms)
+	Gui, 1:Add, CheckBox, vKillDistractions gUpdateFromGUI Checked, Kill Distractions (80ms)
 
 	Gui, 1:Add, CheckBox, vAutoProgress gUpdateFromGUI Checked0, Auto Progress [ON] (every hour)
 
@@ -363,6 +368,15 @@ makeGui() {
 
 
 	Gui, 1:Show
+
+	global CursorPic
+
+	; Create cursor overlay GUI
+	Gui, CursorOverlay:New
+	Gui, CursorOverlay:+AlwaysOnTop -Caption +ToolWindow +E0x20 +LastFound
+	Gui, CursorOverlay:Color, 000000
+	Gui, CursorOverlay:Margin, 0, 0
+	Gui, CursorOverlay:Add, Picture, x0 y0 w32 h32 +BackgroundTrans vCursorPic, C:\Windows\Cursors\arrow_i.cur
 
 	goSub UpdateFromGUI
 
@@ -483,23 +497,43 @@ doClickTest:
 	ControlClick2(880, 410, game_title) ;
 return
 
+
 doKillDistractions:
 	; mouse grid, 3 rows center screen spam clicks kill distractions - this works but takes cursor
 	; Only kill distractions if desktop is physically idle for 10 seconds
-	if ( IsGameActive() AND A_TimeIdlePhysical > 10000 ) {
-		; Store current focused window
+
+    minidle=999
+
+	if ( IsGameActive() AND A_TimeIdlePhysical > minidle ) {
 		WinGet, orig_id, ID, A
-		; Store current mouse position
 		MouseGetPos, origX, origY
+		WinGetPos, owinX, owinY, owinW, owinH, A
+
+
+		; Show cursor overlay at original position
+		x:=origX + owinX+8
+		y:=origY + owinY+32
+		Gui, CursorOverlay:Show, x%x% y%y% NoActivate w8 h16, CursorOverlay
+		cursorOverlayShown := true
+
+		WinGet, hwnd, ID, %game_title% ahk_exe %game_Exe%
+		WinGetPos, winX, winY, winW, winH, ahk_id %hwnd%
 
 		ControlFocus,, %game_title% ahk_exe %game_Exe%
 
 		; MouseClick - works but takes mouse cursor
 		MouseClick, left, 640, 125, 1
+		if (A_TimeIdlePhysical<minidle)
+			goto end_distractions
 		sleep 17
+
 		MouseClick, left, 640, 175, 1
+		if (A_TimeIdlePhysical<minidle)
+			goto end_distractions
 		sleep 17
 		MouseClick, left, 640, 225, 1
+		if (A_TimeIdlePhysical<minidle)
+			goto end_distractions
 		sleep 17
 
 		; MouseClick, left, 1175, 300, 1 ; Also click to collect gold
@@ -511,18 +545,44 @@ doKillDistractions:
 		; MouseClick, left, 1175, 450, 1 ; Also click to collect gold
 		; sleep 17
 
+		MouseClick, left, 640, 360, 1 ; click gems center
+		if (A_TimeIdlePhysical<minidle)
+			goto end_distractions
+		sleep 17
+
+		; Only proceed if we got window size
+		if (winW && winH) {
+			Loop, 4
+			{
+				Random, rx, % (winW // 2), % (winW - 1)
+				Random, ry, % (winH // 3), % (winH * 2 // 3)
+				; Move mouse to random location in right half and bottom 2/3s
+				MouseMove, % (winX + rx), % (winY + ry), 0
+				MouseMove, %rx%, %ry%, 0
+				if (A_TimeIdlePhysical<minidle)
+					goto end_distractions
+				;MouseClick, left, , , 1
+				Sleep, 1
+			}
+		}
+
+		;sleep 1000
+
 		; if ( SkipBossAnimation != 1 ) {
 		; 	naw, leave it in; it adds dps on the field :P
 		; }
-		MouseClick, left, 640, 360, 1 ; click gems center
-		sleep 17
-
-		; Restore mouse position
-		MouseMove, %origX%, %origY%, 0
 		; Restore focus to original window
+
+		end_distractions:
+
 		if (orig_id) {
 			WinActivate, ahk_id %orig_id%
 		}
+		MouseMove, %origX%, %origY%, 0
+		
+		; Hide cursor overlay at end of function
+		Gui, CursorOverlay:Hide
+		cursorOverlayShown := false
 	}
 return
 
